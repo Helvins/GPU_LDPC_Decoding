@@ -1,6 +1,7 @@
 #include "../include/channel.h"
 #include "../include/LDPC_Coding.h"
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
 using namespace std;
@@ -94,6 +95,7 @@ void Channel::Channel_Transfer(float *waveform, int length, float Code_Rate, boo
 	for (int i = 0;i < length;i++) {
 		if (random){
 			waveform[i] += GaussRand(Code_Rate);
+
 		}
 		else{
 			waveform[i] += 2;

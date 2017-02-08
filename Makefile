@@ -4,7 +4,7 @@ SRC = $(CUR_DIR)/src
 INCLUDE = $(CUR_DIR)/include
 BUILD = $(CUR_DIR)/build
 
-CFLAG = -O2 
+CFLAG = -O2
 NFLAG = -Wno-deprecated-gpu-targets -m 64
 
 OBJ = $(BUILD)/main.o $(BUILD)/LDPC_Coding.o $(BUILD)/channel.o $(BUILD)/fileoperation.o

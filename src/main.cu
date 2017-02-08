@@ -22,12 +22,23 @@ int main(int argc, char *argv[]){
 	cudaEvent_t start, stop;										//create cuda event for recording running time 
 	int Info_Size,CodeWord_Size;
 	float Code_Rate;
-	cudaError_t ret;
-	/*set the default number of iteration as 10*/
-	int max_iter = (argc>1)? atoi(argv[1]):10;
-	int num_set, de_sum = 0;							//num_set stands for the number of decoding sets 
+	cudaError_t ret;	
 	float variance, error_rate, elapsedTime;
 	
+	/*input parameters pretreatment*/
+	int num_set, de_sum = 0, max_iter, grid_size, block_size;							//num_set stands for the number of decoding sets 
+	/*set the default number of iteration as 10*/
+	max_iter = (argc>1)? atoi(argv[1]):10;
+	if(argc>2){
+		num_set = atoi(argv[2]);
+	}
+	else{
+		printf("Please input the number of sets of code words: ");
+		scanf("%d", &num_set);
+	}
+	grid_size = (argc>4)?atoi(argv[3]):DEFAULT_CUDA_BLOCK_NUM;
+	block_size = (argc>4)?atoi(argv[4]):DEFAULT_CUDA_THREAD_NUM;
+	printf("grid size: %d, block size: %d\n", grid_size, block_size);
 	/*initialization of basic parameters*/
 #ifdef _LDPC_CODING_H
 	Info_Size = DEFAULT_UNCODEWORD_SIZE;
@@ -77,8 +88,6 @@ int main(int argc, char *argv[]){
 	/*copy memory of index matrix from host terminal to device terminal*/
 	entity_d.CUDA_Memcpy_todev(entity, true, waveform);
 	
-	
-	
 	for (int i = 0; i < CodeWord_Size; i++) {
 		code_word[i] = LDPC_0;
 	}
@@ -87,14 +96,6 @@ int main(int argc, char *argv[]){
 	/*encoding process*/
 	if (entity.LDPC_Encoding(info_seq, code_word)) {
 		printf("LDPC encoding success\n");
-	}
-	
-	if(argc>2){
-		num_set = atoi(argv[2]);
-	}
-	else{
-		printf("Please input the number of sets of code words: ");
-		scanf("%d", &num_set);
 	}
 	
 	//cudaEventRecord(start, 0 );	//start recording time
@@ -113,8 +114,8 @@ int main(int argc, char *argv[]){
 			/*GPU kernel function*/
 			cudaEventRecord(start, 0 );	//start recording time
 			for(int iter = 0; iter < max_iter; iter++){
-				LDPC_Decoding_P1<<<DEFAULT_CUDA_BLOCK_NUM/2, DEFAULT_CUDA_THREAD_NUM>>>(entity_d);	
-				LDPC_Decoding_P2<<<DEFAULT_CUDA_BLOCK_NUM, DEFAULT_CUDA_THREAD_NUM>>>(entity_d);
+				LDPC_Decoding_P1<<<grid_size, block_size/2>>>(entity_d);	
+				LDPC_Decoding_P2<<<grid_size/2, block_size*2>>>(entity_d);
 			}
 			cudaEventRecord(stop, 0 );									//stop recording time
 			

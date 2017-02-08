@@ -330,7 +330,7 @@ float LDPC_Coding::ErrorRate_Check(LDPC_int *info_seq, LDPC_int *de_info_seq) {
 	double error_rate;
 	for(int i =0;i<Info_Size;i++){
 		if (info_seq[i] != de_info_seq[i]) {
-			//cout << i << " ";
+			//printf("%d ", i);
 			sum++;
 		}
 	}

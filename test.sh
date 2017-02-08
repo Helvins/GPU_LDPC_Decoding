@@ -7,6 +7,6 @@ count=1
 while [ $count -le $1 ]
 do 
 	echo "Now is test ${count}"
-	nvprof ./main 1
+	nvprof --unified-memory-profiling off ./main 10 1
 	count=`expr $count + 1`
 done

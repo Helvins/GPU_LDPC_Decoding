@@ -14,4 +14,4 @@ Normally there are 4 optional parameters appended in ./main (number_of_iteration
 
 *number_of_gridsize: denotes the size of grid in Stream multiprocessor(SM). If this input parameter is omitted, the system will adopt 256 as default; 
 
-*number_of_block:  denotes the size of block in Stream multiprocessor(SM). If this input parameter is omitted, the system will adopt 256 as default; 
+*number_of_block:  denotes the size of thread block in Stream multiprocessor(SM). If this input parameter is omitted, the system will adopt 256 as default; 

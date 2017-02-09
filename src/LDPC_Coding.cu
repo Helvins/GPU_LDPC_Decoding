@@ -608,10 +608,9 @@ __global__ void LDPC_Decoding_P1(LDPC_Coding_d entity_d){
 	//use shared memory to calculate the product of multiplication, the size should be assigned in the kernel function
 	/*test*/
 	//block_size/2*MAX_ROW_WEIGHT = 1280
-	__shared__ int tmp_row_index_matrix[1280];
+	__shared__ int tmp_row_index_matrix[MAX_ROW_WEIGHT*DEFAULT_CUDA_THREAD_NUM/2];
 
 	/*step 1: update the probability of check nodes with probability of bit nodes*/
-
 	if(tid_in_grid < entity_d.Info_Size){
 		count = 0;
 		/*assginment from global memory to shared memory*/
@@ -621,16 +620,17 @@ __global__ void LDPC_Decoding_P1(LDPC_Coding_d entity_d){
 			
 		//while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tid_in_grid/4+count] != -1) {						     //update the r0 r1 in the row(th) check formula to count(th) variable node 
 		while (tmp_row_index_matrix[threadIdx.x*entity_d.Row_Weight+count] != -1) {	
-			//the while loop can be substituted for another dimension of thread block(construction of a thread block at a size of 32400*10)
+			__syncthreads();
 			outer_count = 0;
 			product = 1.0;	
-				
-			__syncthreads();
+						
 			//while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tid_in_grid/4+outer_count] != -1) {				 //acquire the node message from other variable nodes first		
-			while (tmp_row_index_matrix[threadIdx.x*entity_d.Row_Weight+outer_count] != -1) {	
+			while (tmp_row_index_matrix[threadIdx.x*entity_d.Row_Weight+outer_count] != -1) {
+				__syncthreads();
 				inner_count = 0;
 				//tmp = entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tid_in_grid/4+outer_count]; 
 				tmp = tmp_row_index_matrix[threadIdx.x*entity_d.Row_Weight+outer_count];
+				
 				while (entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*inner_count/4+tmp] != tid_in_grid) {			 //compare whether two coordinates equal to each other
 					inner_count++;
 				}
@@ -652,7 +652,6 @@ __global__ void LDPC_Decoding_P1(LDPC_Coding_d entity_d){
 	}
 	__syncthreads();
 			
-	
 } 
 
 /*update the prior credibility(p0, p1) and the information of bit-node(q0, q1)*/
@@ -668,7 +667,7 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 	__shared__ float p1_init_sh[DEFAULT_CUDA_THREAD_NUM*2];
 	
 	//block_size*2*MAX_COLUMN_WEIGHT = 7680
-	__shared__ int tmp_col_index_matrix[7680];
+	__shared__ int tmp_col_index_matrix[MAX_COLUMN_WEIGHT*DEFAULT_CUDA_THREAD_NUM*2];
 	
 	/*step 2: update the credibility of bit nodes at iter iteration */
 	if(tid_in_grid < entity_d.CodeWord_Size){
@@ -688,6 +687,7 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 		__syncthreads();
 		//while (entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*count/4+tid_in_grid] != -1) {
 		while (tmp_col_index_matrix[entity_d.Col_Weight*threadIdx.x+count] != -1){	
+			__syncthreads();
 			//tmp = entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*count/4+tid_in_grid];
 			tmp = tmp_col_index_matrix[entity_d.Col_Weight*threadIdx.x+count];
 			inner_count = 0;
@@ -714,6 +714,7 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 		/*warning !!!!!!!*/
 		while (entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*count/4+tid_in_grid] != -1) {								//i stands for column
 		//while (tmp_col_index_matrix[entity_d.Col_Weight*threadIdx.x+count] != -1) {
+			__syncthreads();
 			tmp = entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*count/4+tid_in_grid];
 			//tmp = tmp_col_index_matrix[entity_d.Col_Weight*threadIdx.x+count];
 			inner_count = 0;
@@ -747,7 +748,3 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 
 	__syncthreads();
 }
-
-
-
-

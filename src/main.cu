@@ -29,16 +29,12 @@ int main(int argc, char *argv[]){
 	int num_set, de_sum = 0, max_iter, grid_size, block_size;							//num_set stands for the number of decoding sets 
 	/*set the default number of iteration as 10*/
 	max_iter = (argc>1)? atoi(argv[1]):10;
-	if(argc>2){
-		num_set = atoi(argv[2]);
-	}
-	else{
-		printf("Please input the number of sets of code words: ");
-		scanf("%d", &num_set);
-	}
+	num_set = (argc>2)? atoi(argv[2]):1;
 	grid_size = (argc>4)?atoi(argv[3]):DEFAULT_CUDA_BLOCK_NUM;
 	block_size = (argc>4)?atoi(argv[4]):DEFAULT_CUDA_THREAD_NUM;
 	printf("grid size: %d, block size: %d\n", grid_size, block_size);
+	
+	
 	/*initialization of basic parameters*/
 #ifdef _LDPC_CODING_H
 	Info_Size = DEFAULT_UNCODEWORD_SIZE;

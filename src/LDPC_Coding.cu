@@ -609,6 +609,8 @@ __global__ void LDPC_Decoding_P1(LDPC_Coding_d entity_d){
 	/*test*/
 	//block_size/2*MAX_ROW_WEIGHT = 1280
 	__shared__ int tmp_row_index_matrix[MAX_ROW_WEIGHT*DEFAULT_CUDA_THREAD_NUM/2];
+	//__shared__ float tmp_r0_matrix[MAX_ROW_WEIGHT*DEFAULT_CUDA_THREAD_NUM/2];
+	//__shared__ float tmp_r1_matrix[MAX_ROW_WEIGHT*DEFAULT_CUDA_THREAD_NUM/2];
 
 	/*step 1: update the probability of check nodes with probability of bit nodes*/
 	if(tid_in_grid < entity_d.Info_Size){
@@ -616,6 +618,7 @@ __global__ void LDPC_Decoding_P1(LDPC_Coding_d entity_d){
 		/*assginment from global memory to shared memory*/
 		for(int i=0;i<entity_d.Row_Weight;i++){
 			tmp_row_index_matrix[threadIdx.x*entity_d.Row_Weight+i] = entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tid_in_grid/4+i];
+			//tmp_r0_matrix[threadIdx.x*entity_d.Row_Weight+i] = entity_d.r0_d[entity_d.d_pitch_r*tid_in_grid/4+i];
 		}
 			
 		//while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tid_in_grid/4+count] != -1) {						     //update the r0 r1 in the row(th) check formula to count(th) variable node 
@@ -647,7 +650,7 @@ __global__ void LDPC_Decoding_P1(LDPC_Coding_d entity_d){
 			entity_d.r1_d[entity_d.d_pitch_r*tid_in_grid/4+count] = (1.0 - product) *0.5;
 		
 			count++;		
-		}	
+		}	 
 			
 	}
 	__syncthreads();
@@ -658,7 +661,7 @@ __global__ void LDPC_Decoding_P1(LDPC_Coding_d entity_d){
 __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 	int tid_in_grid = blockDim.x*blockIdx.x+threadIdx.x;           //the position of each thread in a grid, tid_in_block = threadIdx.x
 	int count, inner_count, tmp;
-	float product, product2, sum;
+	float product, product2, sum, res1, res2;
 	
 	/*use shared memory to accelerate the accessing speed*/
 	__shared__ float p0_sh[DEFAULT_CUDA_THREAD_NUM*2];
@@ -700,13 +703,18 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 			__syncthreads();
 			count++;
 		}
+
+		res1 = p0_init_sh[threadIdx.x] * product / (p0_init_sh[threadIdx.x] * product + p1_init_sh[threadIdx.x] * product2);
+		res2 = p1_init_sh[threadIdx.x] * product2 / (p0_init_sh[threadIdx.x] * product + p1_init_sh[threadIdx.x] * product2);
+			
+		/*
+		if(tid_in_grid == 0){
+			printf("p0 is: %.15f, product is: %.15f, product2 is: %.15f, res1 is: %.15f\n",p0_sh[tid_in_grid], product, product2, res1);
+		}*/
 		
-		/*set a tolerance 1e-10 to avoid the not-a-number case*/
-		//entity_d.p0_d[tid_in_grid] = (entity_d.p0_d[tid_in_grid]<1e-10)? 0 : entity_d.p0_init_d[tid_in_grid] * product / (entity_d.p0_init_d[tid_in_grid] * product + entity_d.p1_init_d[tid_in_grid] * product2);
-		//entity_d.p1_d[tid_in_grid] = (entity_d.p0_d[tid_in_grid]<1e-10)? 1 :entity_d.p1_init_d[tid_in_grid] * product2 / (entity_d.p0_init_d[tid_in_grid] * product + entity_d.p1_init_d[tid_in_grid] * product2);
-		p0_sh[threadIdx.x] = (p0_sh[threadIdx.x]<1e-10)? 0 : p0_init_sh[threadIdx.x] * product / (p0_init_sh[threadIdx.x] * product + p1_init_sh[threadIdx.x] * product2);
-		p1_sh[threadIdx.x] = (p0_sh[threadIdx.x]<1e-10)? 1 : p1_init_sh[threadIdx.x] * product2 / (p0_init_sh[threadIdx.x] * product + p1_init_sh[threadIdx.x] * product2);
-		
+		p0_sh[threadIdx.x] = (p0_sh[threadIdx.x]<1e-8)? 0 : res1;
+		p1_sh[threadIdx.x] = (p0_sh[threadIdx.x]<1e-8)? 1 : res2;
+			
 		__syncthreads();
 		
 		/*step 3 update the probability of bit nodes with probability of check nodes*/

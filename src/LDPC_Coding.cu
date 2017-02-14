@@ -704,9 +704,11 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 			count++;
 		}
 
-		res1 = p0_init_sh[threadIdx.x] * product / (p0_init_sh[threadIdx.x] * product + p1_init_sh[threadIdx.x] * product2);
-		res2 = p1_init_sh[threadIdx.x] * product2 / (p0_init_sh[threadIdx.x] * product + p1_init_sh[threadIdx.x] * product2);
-			
+		//res1 = p0_init_sh[threadIdx.x] * product / (p0_init_sh[threadIdx.x] * product + p1_init_sh[threadIdx.x] * product2);
+		//res2 = p1_init_sh[threadIdx.x] * product2 / (p0_init_sh[threadIdx.x] * product + p1_init_sh[threadIdx.x] * product2);
+		res1 = __fdividef(p0_init_sh[threadIdx.x] * product, p0_init_sh[threadIdx.x] * product + p1_init_sh[threadIdx.x] * product2);
+		res2 = __fdividef(p1_init_sh[threadIdx.x] * product2, p0_init_sh[threadIdx.x] * product + p1_init_sh[threadIdx.x] * product2);
+		
 		/*
 		if(tid_in_grid == 0){
 			printf("p0 is: %.15f, product is: %.15f, product2 is: %.15f, res1 is: %.15f\n",p0_sh[tid_in_grid], product, product2, res1);
@@ -730,19 +732,19 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 			while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tmp/4+inner_count] != tid_in_grid) {
 				inner_count++;
 			}
-			//entity_d.q0_d[entity_d.d_pitch_c*count/4+tid_in_grid] = (float)entity_d.p0_d[tid_in_grid] / entity_d.r0_d[entity_d.d_pitch_r*tmp/4+inner_count];
-			//entity_d.q1_d[entity_d.d_pitch_c*count/4+tid_in_grid] = (float)entity_d.p1_d[tid_in_grid] / entity_d.r1_d[entity_d.d_pitch_r*tmp/4+inner_count];
 			
-			entity_d.q0_d[entity_d.d_pitch_c*count/4+tid_in_grid] = p0_sh[threadIdx.x] / entity_d.r0_d[entity_d.d_pitch_r*tmp/4+inner_count];
-			entity_d.q1_d[entity_d.d_pitch_c*count/4+tid_in_grid] = p1_sh[threadIdx.x] / entity_d.r1_d[entity_d.d_pitch_r*tmp/4+inner_count];
-			
+			//entity_d.q0_d[entity_d.d_pitch_c*count/4+tid_in_grid] = p0_sh[threadIdx.x] / entity_d.r0_d[entity_d.d_pitch_r*tmp/4+inner_count];
+			//entity_d.q1_d[entity_d.d_pitch_c*count/4+tid_in_grid] = p1_sh[threadIdx.x] / entity_d.r1_d[entity_d.d_pitch_r*tmp/4+inner_count];
+			entity_d.q0_d[entity_d.d_pitch_c*count/4+tid_in_grid] = __fdividef(p0_sh[threadIdx.x], entity_d.r0_d[entity_d.d_pitch_r*tmp/4+inner_count]);
+			entity_d.q1_d[entity_d.d_pitch_c*count/4+tid_in_grid] = __fdividef(p1_sh[threadIdx.x], entity_d.r1_d[entity_d.d_pitch_r*tmp/4+inner_count]);
 
 			sum = entity_d.q0_d[entity_d.d_pitch_c*count/4+tid_in_grid] + entity_d.q1_d[entity_d.d_pitch_c*count/4+tid_in_grid];
 
 			__syncthreads();
-			entity_d.q0_d[entity_d.d_pitch_c*count/4+tid_in_grid] /= (float)sum;
-			entity_d.q1_d[entity_d.d_pitch_c*count/4+tid_in_grid] /= (float)sum;
-
+			//entity_d.q0_d[entity_d.d_pitch_c*count/4+tid_in_grid] /= (float)sum;
+			//entity_d.q1_d[entity_d.d_pitch_c*count/4+tid_in_grid] /= (float)sum;
+			entity_d.q0_d[entity_d.d_pitch_c*count/4+tid_in_grid] = __fdividef(entity_d.q0_d[entity_d.d_pitch_c*count/4+tid_in_grid], sum);
+			entity_d.q1_d[entity_d.d_pitch_c*count/4+tid_in_grid] = __fdividef(entity_d.q1_d[entity_d.d_pitch_c*count/4+tid_in_grid], sum);
 			__syncthreads();
 			count++;
 		}

@@ -600,22 +600,26 @@ __global__ void LDPC_Decoding_P1(LDPC_Coding_d entity_d){
 	int outer_count, inner_count, tmp;
 	float product;
 	/*use shared memory*/
-	//__shared__ int tmp_row_index_matrix[];
+	__shared__ int tmp_row_index_matrix[320];
 	
 	/*step 1: update the probability of check nodes with probability of bit nodes*/
 
 	if(tid_in_grid < entity_d.Info_Size*blockDim.x){
+
+		tmp_row_index_matrix[threadIdx.y*blockDim.x+threadIdx.x] = entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*temp_thread/4+threadIdx.x];
+		__syncthreads();
+		
 		//while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tid_in_grid/4+count] != -1) {						     //update the r0 r1 in the row(th) check formula to count(th) variable node 
-		if(entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*temp_thread/4+threadIdx.x] != -1){
+		if(tmp_row_index_matrix[threadIdx.y*blockDim.x+threadIdx.x] != -1){
 			outer_count = 0;
 			product = 1.0;	
 				
 			__syncthreads();
-			//while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tid_in_grid/4+outer_count] != -1) {				 //acquire the node message from other variable nodes first		
-			while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*temp_thread/4+outer_count] != -1) {	
+			//while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tid_in_grid/4+outer_count] != -1) {				 //acquire the node message from other variable nodes first				
+			while (tmp_row_index_matrix[threadIdx.y*blockDim.x+outer_count] != -1) {	
 				inner_count = 0;
-				//tmp = entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tid_in_grid/4+outer_count]; 
-				tmp = entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*temp_thread/4+outer_count];                      							 //tmp stores the index to search column
+				//tmp = entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tid_in_grid/4+outer_count];                     							 //tmp stores the index to search column
+				tmp = tmp_row_index_matrix[threadIdx.y*blockDim.x+outer_count]; 
 				//while (entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*inner_count/4+tmp] != tid_in_grid) {			 //compare whether two coordinates equal to each other
 				while (entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*inner_count/4+tmp] != temp_thread) {	
 					inner_count++;
@@ -632,17 +636,16 @@ __global__ void LDPC_Decoding_P1(LDPC_Coding_d entity_d){
 			}
 			//entity_d.r0_d[entity_d.d_pitch_r*tid_in_grid/4+count] = (1.0 + product) *0.5;
 			//entity_d.r1_d[entity_d.d_pitch_r*tid_in_grid/4+count] = (1.0 - product) *0.5;
-			entity_d.r0_d[entity_d.d_pitch_r*temp_thread/4+threadIdx.x] = (1.0 + product) *0.5;
-			entity_d.r1_d[entity_d.d_pitch_r*temp_thread/4+threadIdx.x] = (1.0 - product) *0.5;
+			tmp = entity_d.d_pitch_r*temp_thread/4+threadIdx.x;
+			entity_d.r0_d[tmp] = (1.0 + product) *0.5;
+			entity_d.r1_d[tmp] = (1.0 - product) *0.5;
 
 			//count++;
 			
 		}	
 	}
 	__syncthreads();
-		
-		
-	
+			
 } 
 
 /*update the prior credibility(p0, p1) and the information of bit-node(q0, q1)*/
@@ -650,27 +653,33 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 	int tid_in_grid = blockIdx.x*blockDim.x*blockDim.y+threadIdx.y*blockDim.x+threadIdx.x;           //the position of each thread in a grid, tid_in_block = threadIdx.x
 	int temp_thread = blockIdx.x*blockDim.y+threadIdx.y;
 	int count, inner_count, tmp;
-	float product, product2, sum;
-	//float sum;
+	float product, product2, sum, res1, res2;
 	/*use shared memory*/
-	//__shared__ float product1[1024];
-	//__shared__ float product2[1024];
-	/*
-	for(tmp = 0; tmp<1024; tmp++){
-		product1[tmp] = 1.0;
-		product2[tmp] = 1.0;
-	}*/
+	__shared__ float p0_sh[DEFAULT_CUDA_THREAD_NUM/4];
+	__shared__ float p1_sh[DEFAULT_CUDA_THREAD_NUM/4];
+	__shared__ float p0_init_sh[DEFAULT_CUDA_THREAD_NUM/4];
+	__shared__ float p1_init_sh[DEFAULT_CUDA_THREAD_NUM/4];
+		
+	__shared__ int tmp_col_index_matrix[MAX_COLUMN_WEIGHT*DEFAULT_CUDA_THREAD_NUM/4];
 	
 	/*step 2: update the credibility of bit nodes at iter iteration */
 	if(tid_in_grid < entity_d.CodeWord_Size*blockDim.x){
 		product = 1.0;
 		product2 = 1.0;
 		count = 0;
-		//__syncthreads();
-		while (entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*count/4+temp_thread] != -1) {												//update the p0 p1
-		//if(entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread] != -1) {
-			tmp = entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*count/4+temp_thread];
-			//tmp = entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread];
+		
+		p0_sh[threadIdx.y] = entity_d.p0_d[temp_thread];
+		p1_sh[threadIdx.y] = entity_d.p1_d[temp_thread];
+		p0_init_sh[threadIdx.y] = entity_d.p0_init_d[temp_thread];
+		p1_init_sh[threadIdx.y] = entity_d.p1_init_d[temp_thread];
+		
+		tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x] = entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread];		
+		__syncthreads();
+		
+		while (tmp_col_index_matrix[blockDim.x*threadIdx.y+count] != -1) {	
+		//while (entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*count/4+temp_thread] != -1) {												//update the p0 p1
+			tmp = tmp_col_index_matrix[blockDim.x*threadIdx.y+count];
+			//tmp = entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*count/4+temp_thread];
 			inner_count = 0;
 			//while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tmp/4+inner_count] != tid_in_grid) {
 			while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tmp/4+inner_count] != temp_thread) {
@@ -679,39 +688,27 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 			
 			product *= entity_d.r0_d[entity_d.d_pitch_r*tmp/4+inner_count];
 			product2 *= entity_d.r1_d[entity_d.d_pitch_r*tmp/4+inner_count];
-			//product1[blockDim.x*threadIdx.y+threadIdx.x] = entity_d.r0_d[entity_d.d_pitch_r*tmp/4+inner_count];
-			//product2[blockDim.x*threadIdx.y+threadIdx.x] = entity_d.r1_d[entity_d.d_pitch_r*tmp/4+inner_count];
-			__syncthreads();
-			/*
-			for(int offset = blockDim.x/2; offset>0; offset >>= 1){
-				if(threadIdx.x<offset){
-					product1[blockDim.x*threadIdx.y+threadIdx.x] *= product1[blockDim.x*threadIdx.y+threadIdx.x+offset];
-					product2[blockDim.x*threadIdx.y+threadIdx.x] *= product2[blockDim.x*threadIdx.y+threadIdx.x+offset];
-				}			
-			}*/
 			__syncthreads();
 			
 			count++;
 		}
 		
+		res1 = __fdividef(p0_init_sh[threadIdx.y] * product, p0_init_sh[threadIdx.y] * product + p1_init_sh[threadIdx.y] * product2);
+		res2 = __fdividef(p1_init_sh[threadIdx.y] * product2, p0_init_sh[threadIdx.y] * product + p1_init_sh[threadIdx.y] * product2);
+		
 		/*set a tolerance 1e-10 to avoid the not-a-number case*/
-		entity_d.p0_d[temp_thread] = (entity_d.p0_d[temp_thread]<1e-10)? 0 : entity_d.p0_init_d[temp_thread] * product / (entity_d.p0_init_d[temp_thread] * product + entity_d.p1_init_d[temp_thread] * product2);
-		entity_d.p1_d[temp_thread] = (entity_d.p0_d[temp_thread]<1e-10)? 1 :entity_d.p1_init_d[temp_thread] * product2 / (entity_d.p0_init_d[temp_thread] * product + entity_d.p1_init_d[temp_thread] * product2);
-		/*
-		if(threadIdx.x == 0){
-			
-			entity_d.p0_d[temp_thread] = (entity_d.p0_d[temp_thread]<1e-10)? 0 : entity_d.p0_init_d[temp_thread] * product1[blockDim.x*threadIdx.y] / (entity_d.p0_init_d[temp_thread] * product1[blockDim.x*threadIdx.y] + entity_d.p1_init_d[temp_thread] * product2[blockDim.x*threadIdx.y]);
-			entity_d.p1_d[temp_thread] = (entity_d.p0_d[temp_thread]<1e-10)? 1 : entity_d.p1_init_d[temp_thread] * product2[blockDim.x*threadIdx.y] / (entity_d.p0_init_d[temp_thread] * product1[blockDim.x*threadIdx.y] + entity_d.p1_init_d[temp_thread] * product2[blockDim.x*threadIdx.y]);
-		}*/
-					
+		//entity_d.p0_d[temp_thread] = (entity_d.p0_d[temp_thread]<1e-10)? 0 : entity_d.p0_init_d[temp_thread] * product / (entity_d.p0_init_d[temp_thread] * product + entity_d.p1_init_d[temp_thread] * product2);
+		//entity_d.p1_d[temp_thread] = (entity_d.p0_d[temp_thread]<1e-10)? 1 :entity_d.p1_init_d[temp_thread] * product2 / (entity_d.p0_init_d[temp_thread] * product + entity_d.p1_init_d[temp_thread] * product2);
+		
+		p0_sh[threadIdx.y] = (p0_sh[threadIdx.y]<1e-10)? 0 : res1;
+		p1_sh[threadIdx.y] = (p0_sh[threadIdx.y]<1e-10)? 1 : res2;
+				
 		__syncthreads();
 		
 		/*step 3 update the probability of bit nodes with probability of check nodes*/
-		//count = 0;
-		//while (entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*count/4+tid_in_grid] != -1) {								//i stands for column
-		if(entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread] != -1) {
+		if(tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x] != -1) {
 			//tmp = entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*count/4+tid_in_grid];
-			tmp = entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread];
+			tmp = tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x];
 			inner_count = 0;
 			
 			//while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tmp/4+inner_count] != tid_in_grid) {
@@ -721,9 +718,9 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 			
 			//entity_d.q0_d[entity_d.d_pitch_c*count/4+tid_in_grid] = (float)entity_d.p0_d[tid_in_grid] / entity_d.r0_d[entity_d.d_pitch_r*tmp/4+inner_count];
 			//entity_d.q1_d[entity_d.d_pitch_c*count/4+tid_in_grid] = (float)entity_d.p1_d[tid_in_grid] / entity_d.r1_d[entity_d.d_pitch_r*tmp/4+inner_count];
-			
-			entity_d.q0_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread] = (float)entity_d.p0_d[temp_thread] / entity_d.r0_d[entity_d.d_pitch_r*tmp/4+inner_count];
-			entity_d.q1_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread] = (float)entity_d.p1_d[temp_thread] / entity_d.r1_d[entity_d.d_pitch_r*tmp/4+inner_count];
+
+			entity_d.q0_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread] = (float)p0_sh[threadIdx.y] / entity_d.r0_d[entity_d.d_pitch_r*tmp/4+inner_count];
+			entity_d.q1_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread] = (float)p1_sh[threadIdx.y] / entity_d.r1_d[entity_d.d_pitch_r*tmp/4+inner_count];
 			
 			//sum = entity_d.q0_d[entity_d.d_pitch_c*count/4+tid_in_grid] + entity_d.q1_d[entity_d.d_pitch_c*count/4+tid_in_grid];
 			sum = entity_d.q0_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread] + entity_d.q1_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread];
@@ -741,8 +738,9 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 		
 		/* step 5 hard decision */ 
 		//entity_d.de_info_seq_d[tid_in_grid] = (entity_d.p1_d[tid_in_grid] > 0.5) ? LDPC_1 : LDPC_0;
-		entity_d.de_info_seq_d[temp_thread] = (entity_d.p1_d[temp_thread] > 0.5) ? LDPC_1 : LDPC_0;
-		
+		entity_d.de_info_seq_d[temp_thread] = (p1_sh[threadIdx.y] > 0.5) ? LDPC_1 : LDPC_0;
+		entity_d.p0_d[temp_thread] = p0_sh[threadIdx.y];
+		entity_d.p1_d[temp_thread] = p1_sh[threadIdx.y];
 		
 	}
 

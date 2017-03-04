@@ -8,6 +8,7 @@
 /*local headers*/
 #include "../include/LDPC_Coding.h"
 #include "../include/channel.h"
+#include "../include/fileoperation.h"
 
 using namespace std;
 
@@ -69,7 +70,7 @@ int main(int argc, char *argv[]){
 		printf("Scan Check matrix success, now we have row and column index matrix\n" );
 	}
 	/*write row and column index matrix to the output files*/
-	entity.WriteData();
+	//entity.WriteData();
 	
 	/*Memory copy operation from host terminal to device terminal(should include error handling!!!)*/
 	//entity_d->CUDA_Memcpy_todev(entity);
@@ -113,8 +114,7 @@ int main(int argc, char *argv[]){
 		
 		
 		//printf("LDPC decoding success, now try to acquire decoded sequence from GPU terminal\n");
-		entity_d.CUDA_Data_callback(de_info_seq);
-								
+		entity_d.CUDA_Data_callback(de_info_seq);				
 		error_rate = entity.ErrorRate_Check(info_seq, de_info_seq);
 		de_sum += error_rate*Info_Size;
 		
@@ -128,16 +128,11 @@ int main(int argc, char *argv[]){
 	if (ret == cudaSuccess){
 		printf("The elapsed time for LDPC decoding is %f ms\n", elapsedTime);
 	}
-	
-	/*for test use*/	
-	/*
-	for(int i = 0;i<10;i++){
-		int tmp1 = de_info_seq[i]? 1 : 0;
-		int tmp2 = de_info_seq[i+16200]? 1 : 0;
-		printf("%d: %d, %d:, %d\n", i, tmp1, i+16200, tmp2);
-	}*/
+
 	cudaEventDestroy(start);
 	cudaEventDestroy(stop);
 		
+	
+	
 	return 0;
 }

@@ -17,7 +17,7 @@ typedef bool LDPC_int;
 #define DEFAULT_UNCODEWORD_SIZE (unsigned int)(DEFAULT_CODEWORD_SIZE*DEFAULT_CODE_RATE)  	  // namely the size of information bit(32400 in this case)
 #define DEFAULT_BLOCK_NUM (unsigned int)(DEFAULT_UNCODEWORD_SIZE/360.0) 					  //(90 in this case)
 #define MAX_ROW_WEIGHT 10  																  //the maximum row weight of sparse check matrix
-#define MAX_COLUMN_WEIGHT 15																  //the maximum column weight of sparse check matrix, we can get it from the DVB-S2 
+#define MAX_COLUMN_WEIGHT 16																  //the maximum column weight of sparse check matrix, we can get it from the DVB-S2 
 
 /*macro definition for cuda configuration*/
 #define DEFAULT_CUDA_BLOCK_NUM 256
@@ -60,6 +60,7 @@ private:
 class LDPC_Coding_d {
 public:
 	LDPC_Coding_d();
+	LDPC_Coding_d(int size, float rate);
 	~LDPC_Coding_d();
 	/*allocate memory for p0_d, p1_d, p0_init_d, p1_init_d, q0_d, q1_d, r0_d, r1_d, Index_Col_Matrix_d and Index_Row_Matrix_d*/
 	bool Devide_Memory_Space_Allocation();

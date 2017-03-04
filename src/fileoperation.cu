@@ -4,6 +4,7 @@
 #include <math.h>
 #include <string.h>
 #include "../include/fileoperation.h"
+#include "../include/LDPC_Coding.h"
 using namespace std;
 
 
@@ -31,7 +32,7 @@ void CloseDataFile() {
 }
 
 int ReadData(int *buf) {
-	memset(buf, -1, 15); //initialize the memory space
+	memset(buf, -1, MAX_COLUMN_WEIGHT); //initialize the memory space
 	int digitcount = 0, sum = 0;
 	if (infile.is_open()) {
 		int totalcount = 0;
@@ -83,7 +84,7 @@ int GetIdx(int *buf) {
 }
 
 int ReadLineData(int *buf) {
-	memset(buf, -1, 15); //initialize the memory space
+	memset(buf, -1, MAX_COLUMN_WEIGHT); //initialize the memory space
 	int totalcount = 0, digitcount = 0, sum = 0;
 	if (!infile.eof()) {
 		getline(infile, line);
@@ -135,6 +136,16 @@ void WriteMatrixData(int *buf, int row, int col) {
 		outfile << endl;
 	}
 	outfile<<endl<<endl;
+}
+
+void WriteDecodedData(LDPC_int *buf, int length){
+	int tmp;
+	outfile << "Now writing decoded data"<<endl;
+	for(int i=0;i<length;i++){
+		tmp = (buf[i])? 1:0;
+		outfile<< tmp <<" ";
+	}
+	outfile<<endl;
 }
 
 

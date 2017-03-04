@@ -2,6 +2,7 @@
 #ifndef _FILEOPERATION_H
 #define _FILEOPERATION_H
 
+#include "../include/LDPC_Coding.h"
 #define INFILE_NAME "data/datain.txt"
 #define OUTFILE_NAME "data/dataout.txt"
 
@@ -16,6 +17,7 @@ int ReadLineData(int *buf); //return the total number of data in a sigle line,
 void WriteMatrixData(int *buf, int row, int col);   //write the matrix data to the txt file
 //int WriteVectorData(LDPC_int *buf, int length);
 
+void WriteDecodedData(LDPC_int *buf, int length);
 
 
 #endif

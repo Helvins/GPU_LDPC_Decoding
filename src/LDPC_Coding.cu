@@ -694,8 +694,8 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 		tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x] = entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread];		
 		__syncthreads();
 		
-		//while (tmp_col_index_matrix[blockDim.x*threadIdx.y+count] != -1) {	
-		if(tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x] != -1){											//update the p0 p1
+		while (tmp_col_index_matrix[blockDim.x*threadIdx.y+count] != -1) {	
+		//if(tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x] != -1){											//update the p0 p1
 			//tmp = tmp_col_index_matrix[blockDim.x*threadIdx.y+count];
 			tmp = tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x];
 			inner_count = 0;
@@ -709,7 +709,7 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 			__syncthreads();
 			
 			count++;
-		//}
+		}
 		
 		/*set a tolerance 1e-10 to avoid the not-a-number case*/
 		//entity_d.p0_d[temp_thread] = (entity_d.p0_d[temp_thread]<1e-10)? 0 : entity_d.p0_init_d[temp_thread] * product / (entity_d.p0_init_d[temp_thread] * product + entity_d.p1_init_d[temp_thread] * product2);

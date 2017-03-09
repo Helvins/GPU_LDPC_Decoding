@@ -721,9 +721,9 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 		__syncthreads();
 		
 		/*step 3 update the probability of bit nodes with probability of check nodes*/
-		//if(tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x] != -1) {
-			//tmp = entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*count/4+tid_in_grid];
-			tmp = tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x];
+		if(tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x] != -1) {
+			tmp = entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*count/4+tid_in_grid];
+			//tmp = tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x];
 			inner_count = 0;
 			
 			//while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tmp/4+inner_count] != tid_in_grid) {

@@ -5,7 +5,7 @@ INCLUDE = $(CUR_DIR)/include
 BUILD = $(CUR_DIR)/build
 
 CFLAG = -O2
-NFLAG = -Wno-deprecated-gpu-targets -m 64 -use_fast_math -D DEBUG
+NFLAG = -arch=compute_35 -m 64 -use_fast_math
 
 OBJ = $(BUILD)/main.o $(BUILD)/LDPC_Coding.o $(BUILD)/channel.o $(BUILD)/fileoperation.o
 vpath %.o $(BUILD)

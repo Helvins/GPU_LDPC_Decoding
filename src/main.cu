@@ -3,8 +3,10 @@
 #include <iostream>
 #include <string.h>
 #include <stdlib.h>
+
 /*The library in device terminal*/
 #include <cuda_runtime_api.h>
+
 /*local headers*/
 #include "../include/LDPC_Coding.h"
 #include "../include/channel.h"

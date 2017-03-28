@@ -60,6 +60,7 @@ private:
 class LDPC_Coding_d {
 public:
 	LDPC_Coding_d();
+	LDPC_Coding_d(int num);
 	LDPC_Coding_d(int size, float rate);
 	~LDPC_Coding_d();
 	/*allocate memory for p0_d, p1_d, p0_init_d, p1_init_d, q0_d, q1_d, r0_d, r1_d, Index_Col_Matrix_d and Index_Row_Matrix_d*/
@@ -87,6 +88,9 @@ public:
 	int Info_Size;													  			  //the size of LDPC information sequence, namely K 
 	int Col_Weight;
 	int Row_Weight;
+	
+	int num_set;
+	
 	int *Index_Row_Matrix_d;											  		  //matrix to store the column position of non-zero elements(Info_Size*MAX_ROW_WEIGHT), the size of each row is the row weight of the sparse matrix 	
 	int *Index_Col_Matrix_d;										      		  //matrix to store the row position of non-zero elements(MAX_COLUMN_WEIGHT*CodeWord_Size), the size of each column is the column weight of the sparse matrix 
 };

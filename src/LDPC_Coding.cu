@@ -27,10 +27,12 @@ LDPC_Coding::LDPC_Coding() {
 }
 
 /*Overloading the constructor*/
-LDPC_Coding::LDPC_Coding(int size, float rate) {
+LDPC_Coding::LDPC_Coding(int size, float rate, int type) {
+	printf("The size of code word is: %d, the baud rate is: %f\n", size, rate);
 	CodeWord_Size = size;
 	Code_Rate = rate;
 	Info_Size = (unsigned int)(size*rate);
+	type_baud_rate = type;
 	Blk_Num = (unsigned int)(Info_Size / 360.0);
 
 }
@@ -366,6 +368,14 @@ LDPC_Coding_d::LDPC_Coding_d(){
 	Row_Weight = MAX_ROW_WEIGHT;
 }
 
+LDPC_Coding_d::LDPC_Coding_d(int size, float rate){
+	CodeWord_Size = size;
+	Code_Rate = rate;
+	Info_Size = (unsigned int)(size*rate);
+	Col_Weight = MAX_COLUMN_WEIGHT;
+	Row_Weight = MAX_ROW_WEIGHT;
+}
+
 LDPC_Coding_d::~LDPC_Coding_d(){
 	
 }
@@ -471,25 +481,29 @@ bool LDPC_Coding_d::Devide_Memory_Space_Allocation(){
 
 bool LDPC_Coding_d::CUDA_Configuration(dim3 cfg_para[]){
 	/*create a grid containing 256 blocks with 256 threads of each block*/
-
+	dim3 numBlocksInit(ceil(CodeWord_Size/DEFAULT_CUDA_THREAD_NUM),1,1);
+	dim3 threadsPerBlockInit(DEFAULT_CUDA_THREAD_NUM, 1);
 	
-	dim3 numBlocksP1(ceil(DEFAULT_UNCODEWORD_SIZE/16),1,1);
+	dim3 numBlocksP1(ceil(CodeWord_Size/16),1,1);
 	dim3 threadsPerBlockP1(MAX_ROW_WEIGHT, 16, 1);
 	/*assign the size of shared memory in kernel function P1*/
 	dim3 size_memP1(16*MAX_ROW_WEIGHT*sizeof(int), 1, 1);
 	
 	//dim3 numBlocksP2(DEFAULT_CUDA_BLOCK_NUM*8,1,1);
-	dim3 numBlocksP2(ceil(DEFAULT_CODEWORD_SIZE/32),1,1);
+	dim3 numBlocksP2(ceil(CodeWord_Size/32),1,1);
 	dim3 threadsPerBlockP2(MAX_COLUMN_WEIGHT, 32, 1);
 	dim3 size_memP2(3*MAX_COLUMN_WEIGHT*32*sizeof(float), 1, 1);
 	
-	cfg_para[0] = numBlocksP1;
-	cfg_para[1] = threadsPerBlockP1;
-	cfg_para[2] = size_memP1;
+	cfg_para[0] = numBlocksInit;
+	cfg_para[1] = threadsPerBlockInit;
 	
-	cfg_para[3] = numBlocksP2;
-	cfg_para[4] = threadsPerBlockP2;
-	cfg_para[5] = size_memP2;
+	cfg_para[3] = numBlocksP1;
+	cfg_para[4] = threadsPerBlockP1;
+	cfg_para[5] = size_memP1;
+	
+	cfg_para[6] = numBlocksP2;
+	cfg_para[7] = threadsPerBlockP2;
+	cfg_para[8] = size_memP2;
 	
 	return SUCCESS;
 }

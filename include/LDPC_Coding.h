@@ -27,7 +27,7 @@ typedef bool LDPC_int;
 class LDPC_Coding {
 public:
 	LDPC_Coding();
-	LDPC_Coding(int size, float rate);
+	LDPC_Coding(int size, float rate, int type);
 	~LDPC_Coding();
 	bool Memory_Space_Allocation();
 	bool Sparse_Cyclic_Matrix_Construct();							  					 	  //Ha matrix
@@ -51,6 +51,7 @@ private:
 	int CodeWord_Size;												  						  //the size of LDPC codeword, namely N
 	float Code_Rate;
 	int Info_Size;													  						  //the size of LDPC information sequence, namely K 
+	int type_baud_rate;
 	int Blk_Num;													  						  //namely the number of lines in each table
 	LDPC_int *Check_Matrix;										  						  	  //check matrix H to supervise whether there are error bit in the codeword
 	 
@@ -60,7 +61,6 @@ private:
 class LDPC_Coding_d {
 public:
 	LDPC_Coding_d();
-	LDPC_Coding_d(int num);
 	LDPC_Coding_d(int size, float rate);
 	~LDPC_Coding_d();
 	/*allocate memory for p0_d, p1_d, p0_init_d, p1_init_d, q0_d, q1_d, r0_d, r1_d, Index_Col_Matrix_d and Index_Row_Matrix_d*/

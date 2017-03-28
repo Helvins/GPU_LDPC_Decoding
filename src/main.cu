@@ -3,10 +3,8 @@
 #include <iostream>
 #include <string.h>
 #include <stdlib.h>
-
 /*The library in device terminal*/
 #include <cuda_runtime_api.h>
-
 /*local headers*/
 #include "../include/LDPC_Coding.h"
 #include "../include/channel.h"
@@ -18,29 +16,84 @@ int main(int argc, char *argv[]){
 	
 	cudaEvent_t start, stop;										//create cuda event for recording running time 
 	int Info_Size,CodeWord_Size;
+	int type_baud_rate;
 	float Code_Rate;
 	cudaError_t ret;	
 	float variance, error_rate, elapsedTime;
-	dim3 cfg_para[6];
+	dim3 cfg_para[9];
 	
 	/*input parameters pretreatment*/
-	int num_set, de_sum = 0, max_iter, grid_size, block_size;							//num_set stands for the number of decoding sets 
+	int num_set, de_sum = 0, max_iter;							//num_set stands for the number of decoding sets 
 	/*set the default number of iteration as 10*/
-	max_iter = (argc>1)? atoi(argv[1]):10;
-	num_set = (argc>2)? atoi(argv[2]):1;
-	grid_size = (argc>4)?atoi(argv[3]):DEFAULT_CUDA_BLOCK_NUM;
-	block_size = (argc>4)?atoi(argv[4]):DEFAULT_CUDA_THREAD_NUM;
-	printf("grid size: %d, block size: %d\n", grid_size, block_size);	
+	type_baud_rate = (argc>1)? atoi(argv[1]):0;
+	max_iter = (argc>2)? atoi(argv[2]):10;
+	num_set = (argc>3)? atoi(argv[3]):1;
 	
 	/*initialization of basic parameters*/
-#ifdef _LDPC_CODING_H
-	Info_Size = DEFAULT_UNCODEWORD_SIZE;
-	CodeWord_Size = DEFAULT_CODEWORD_SIZE;
-	Code_Rate = DEFAULT_CODE_RATE;
-#endif
+	switch(type_baud_rate){
+		//code word size:64800 code rate: 1/2
+		case 0:{
+			Info_Size = DEFAULT_UNCODEWORD_SIZE;
+			CodeWord_Size = DEFAULT_CODEWORD_SIZE;
+			Code_Rate = DEFAULT_CODE_RATE;
+		}break;
+		//code word size:64800 code rate: 1/2
+		case 1:{
+			Info_Size = 21600;
+			CodeWord_Size = 64800;
+			Code_Rate = 1.0/3.0;
+		}break;
+		//code word size:64800 code rate: 1/2
+		case 2:{
+			Info_Size = 16200;
+			CodeWord_Size = 64800;
+			Code_Rate = 1.0/4.0;
+		}break;
+		//code word size:64800 code rate: 2/3
+		case 3:{
+			Info_Size = 43200;
+			CodeWord_Size = 64800;
+			Code_Rate = 2.0/3.0;
+		}break;
+		//code word size:64800 code rate: 3/4
+		case 4:{
+			Info_Size = 48600;
+			CodeWord_Size = 64800;
+			Code_Rate = 3.0/4.0;
+		}break;
+		//code word size:64800 code rate: 9/10
+		case 5:{
+			Info_Size = 58320;
+			CodeWord_Size = 64800;
+			Code_Rate = 9.0/10.0;
+		}break;
+		//code word size:64800 code rate: 1/4
+		case 6:{
+			Info_Size = 4050;
+			CodeWord_Size = 16200;
+			Code_Rate = 1.0/4.0;
+		}break;
+		//code word size:16400 code rate: 1/2
+		case 7:{
+			Info_Size = 8100;
+			CodeWord_Size = 16200;
+			Code_Rate = 1.0/2.0;
+		}break;
+		//code word size:16200 code rate: 8/9
+		case 8:{
+			Info_Size = 14400;
+			CodeWord_Size = 16200;
+			Code_Rate = 8.0/9.0;
+		}break;
+		default:{
+			Info_Size = DEFAULT_UNCODEWORD_SIZE;
+			CodeWord_Size = DEFAULT_CODEWORD_SIZE;
+			Code_Rate = DEFAULT_CODE_RATE;
+		}break;
+	}
 	//cout.flush();
-	LDPC_Coding entity;
-	LDPC_Coding_d entity_d;
+	LDPC_Coding entity(CodeWord_Size, Code_Rate, type_baud_rate);
+	LDPC_Coding_d entity_d(CodeWord_Size, Code_Rate);
 	Channel *chn = new Channel();
 	variance = chn->GetVar(Code_Rate);
 	
@@ -103,12 +156,12 @@ int main(int argc, char *argv[]){
 		entity_d.CUDA_Memcpy_todev(entity, false, waveform);
 	    //calls for GPU kernel function
 		{
-			CUDA_Info_Init<<<DEFAULT_CUDA_BLOCK_NUM, DEFAULT_CUDA_THREAD_NUM>>>(entity_d, variance);
+			CUDA_Info_Init<<<cfg_para[0], cfg_para[1]>>>(entity_d, variance);
 			/*GPU kernel function*/
 			cudaEventRecord(start, 0 );	//start recording time
 			for(int iter = 0; iter < max_iter; iter++){	
-				LDPC_Decoding_P1<<<cfg_para[0], cfg_para[1]>>>(entity_d);	
-				LDPC_Decoding_P2<<<cfg_para[3], cfg_para[4]>>>(entity_d);
+				LDPC_Decoding_P1<<<cfg_para[3], cfg_para[4]>>>(entity_d);	
+				LDPC_Decoding_P2<<<cfg_para[6], cfg_para[7]>>>(entity_d);
 			}
 			cudaEventRecord(stop, 0 );									//stop recording time
 			

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <algorithm>
 #include <math.h>
 #include <string.h>
@@ -13,8 +14,12 @@ ifstream infile;
 ofstream outfile;
 string line;
 
-void OpenDataFile() {
-	infile.open(INFILE_NAME, ios::in);
+void OpenDataFile(int type) {
+	stringstream num;
+	num<<type;
+	string strName = INFILE_NAME + num.str() + ".txt";
+	//printf("The file name is: %s\n", strName.c_str());
+	infile.open(strName.c_str(), ios::in);
 	if (!infile.is_open()) {
 		cout << "Error opening infile!" << endl;
 		exit(1);

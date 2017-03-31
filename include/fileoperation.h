@@ -3,11 +3,11 @@
 #define _FILEOPERATION_H
 
 #include "../include/LDPC_Coding.h"
-#define INFILE_NAME "data/datain.txt"
+#define INFILE_NAME "data/datain"
 #define OUTFILE_NAME "data/dataout.txt"
 
 /*API for reading data from the file*/
-void OpenDataFile();
+void OpenDataFile(int type);
 void CloseDataFile();
 int ReadData(int *buf);  //return total number of data in the file
 int GetIdx(int *buf); //return the index data from the buffer at the current cursor

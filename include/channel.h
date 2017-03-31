@@ -3,7 +3,7 @@
 #define __CHANNEL_H
 
 #include "LDPC_Coding.h"
-#define DEFAULT_SNR 3
+#define DEFAULT_SNR 2.0
 #define D_QPSK 0.70710678
 
 class Channel{

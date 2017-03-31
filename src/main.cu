@@ -125,7 +125,7 @@ int main(int argc, char *argv[]){
 		printf("Scan Check matrix success, now we have row and column index matrix\n" );
 	}
 	/*write row and column index matrix to the output files*/
-	//entity.WriteData();
+	entity.WriteData();
 	
 	/*Memory copy operation from host terminal to device terminal(should include error handling!!!)*/
 	//entity_d->CUDA_Memcpy_todev(entity);
@@ -158,6 +158,7 @@ int main(int argc, char *argv[]){
 		{
 			CUDA_Info_Init<<<cfg_para[0], cfg_para[1]>>>(entity_d, variance);
 			/*GPU kernel function*/
+			
 			cudaEventRecord(start, 0 );	//start recording time
 			for(int iter = 0; iter < max_iter; iter++){	
 				LDPC_Decoding_P1<<<cfg_para[3], cfg_para[4]>>>(entity_d);	
@@ -180,6 +181,7 @@ int main(int argc, char *argv[]){
 	
 	ret = cudaEventElapsedTime( &elapsedTime, start, stop );
 	checkCudaErrors(ret);
+	
 	if (ret == cudaSuccess){
 		printf("The elapsed time for LDPC decoding is %f ms\n", elapsedTime);
 	}

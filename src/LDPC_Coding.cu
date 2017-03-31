@@ -28,18 +28,18 @@ LDPC_Coding::LDPC_Coding() {
 
 /*Overloading the constructor*/
 LDPC_Coding::LDPC_Coding(int size, float rate, int type) {
-	printf("The size of code word is: %d, the baud rate is: %f\n", size, rate);
+	printf("The size of code word is: %d, the baud rate is: %.2f\n", size, rate);
 	CodeWord_Size = size;
 	Code_Rate = rate;
 	Info_Size = (unsigned int)(size*rate);
 	type_baud_rate = type;
-	Blk_Num = (unsigned int)(Info_Size / 360.0);
+	//Blk_Num = (unsigned int)(Info_Size / 360.0);
 
 }
 
 bool LDPC_Coding::Memory_Space_Allocation() {
-	/*allocate memory space for Info_Size*CodeWord_Size check matrix*/
-	Check_Matrix = (LDPC_int *)malloc(Info_Size*CodeWord_Size*sizeof(LDPC_int));				//warning:can be substituted by cudaHostMalloc
+	/*allocate memory space for (CodeWord_Size-Info_Size)*CodeWord_Size check matrix*/
+	Check_Matrix = (LDPC_int *)malloc((CodeWord_Size-Info_Size)*CodeWord_Size*sizeof(LDPC_int));				//warning:can be substituted by cudaHostMalloc
 	if (!Check_Matrix) {
 		printf("Error:Can't allocate memory space for check matrix!\n");
 		return FAIL;
@@ -47,7 +47,7 @@ bool LDPC_Coding::Memory_Space_Allocation() {
 
 	
 	/*use page-locked memory in the host*/
-	ret = cudaMallocHost((void**)&Index_Row_Matrix, Info_Size*MAX_ROW_WEIGHT*sizeof(int));
+	ret = cudaMallocHost((void**)&Index_Row_Matrix, (CodeWord_Size-Info_Size)*MAX_ROW_WEIGHT*sizeof(int));
 	checkCudaErrors(ret);
 	if(ret != cudaSuccess){
 		printf("Error:Can't allocate memory space for row index matrix!\n");
@@ -70,7 +70,7 @@ bool LDPC_Coding::Memory_Space_Allocation() {
 	}
 
 	/*initialization for a K*N check matrix */
-	for (int row = 0;row < Info_Size;row++) {
+	for (int row = 0;row < (CodeWord_Size-Info_Size);row++) {
 		for (int col = 0;col < CodeWord_Size; col++) {
 			//Check_Matrix[row][col] = LDPC_0;
 			Check_Matrix[row*CodeWord_Size+col] = LDPC_0;
@@ -78,7 +78,7 @@ bool LDPC_Coding::Memory_Space_Allocation() {
 	}
 
 	/*initialization for the row index matrix*/
-	for (int h = 0;h < Info_Size;h++) {
+	for (int h = 0;h < (CodeWord_Size-Info_Size);h++) {
 		for (int i = 0;i < MAX_ROW_WEIGHT;i++) {
 			//Index_Row_Matrix[h][i] = -1;
 			Index_Row_Matrix[h*MAX_ROW_WEIGHT+i] = -1;
@@ -124,11 +124,27 @@ LDPC_Coding::~LDPC_Coding() {
 
 bool LDPC_Coding::Sparse_Cyclic_Matrix_Construct() {
 	register unsigned short trrow, trcol;
-	int totalcount = 0, currentcount = 0;
-	OpenDataFile();
-
+	int totalcount = 0, currentcount = 0;	
+	int q;
+	
+	switch(type_baud_rate){
+		case 0: q = 90; break;
+		case 1: q = 120; break;
+		case 2: q = 135; break;
+		case 3: q = 60; break;
+		case 4: q = 45; break;
+		case 5: q = 18; break;
+		case 6: q = 36; break;
+		case 7: q = 25; break;
+		case 8: q = 5; break;
+		default: q = 90; break;
+	}
+	Blk_Num = (unsigned int)(CodeWord_Size / 360.0)-q;
+	cout<<"The block num is: "<<Blk_Num<<endl;
+	OpenDataFile(type_baud_rate);
 	for (short subblock_num = 0;subblock_num < Blk_Num; subblock_num++) {
-		totalcount = ReadLineData(idxdata);  // the index data is stored in the idxdata buffer	
+		totalcount = ReadLineData(idxdata);  // the index data is stored in the idxdata buffer
+
 		if (totalcount != -1) {
 			for (short col = 0; col < 360; col++) {
 				currentcount = 0;
@@ -136,7 +152,7 @@ bool LDPC_Coding::Sparse_Cyclic_Matrix_Construct() {
 				while (currentcount < totalcount) {
 					//-1 stands for the EOF
 	
-					trrow = (idxdata[currentcount] + Blk_Num * col) % (CodeWord_Size - Info_Size);
+					trrow = (idxdata[currentcount] + q * col) % (CodeWord_Size - Info_Size);
 					trcol = col + subblock_num * 360;
 
 					//Check_Matrix[trrow][trcol] = LDPC_1;
@@ -223,7 +239,7 @@ bool LDPC_Coding::Calculate_Max_Row_Weight() {
 bool LDPC_Coding::Scan_Check_Matrix() {
 	
 	int currentcount;
-	for (int i = 0;i < Info_Size;i++) {
+	for (int i = 0;i < (CodeWord_Size-Info_Size);i++) {
 		currentcount = 0;
 		for (int j = 0;j < CodeWord_Size;j++) {
 			//if (Check_Matrix[i][j]) {
@@ -250,8 +266,8 @@ bool LDPC_Coding::Scan_Check_Matrix() {
 
 void LDPC_Coding::WriteData(){
 	printf("Now try to write the row and column index matrix into the output file\n");
-	WriteMatrixData(Index_Row_Matrix, Info_Size, MAX_ROW_WEIGHT);
-	WriteMatrixData(Index_Col_Matrix, MAX_ROW_WEIGHT, CodeWord_Size);
+	WriteMatrixData(Index_Row_Matrix, (CodeWord_Size-Info_Size), MAX_ROW_WEIGHT);
+	//WriteMatrixData(Index_Col_Matrix, MAX_ROW_WEIGHT, CodeWord_Size);
 }
 
 /*LDPC encoding to generate a code word*/
@@ -269,7 +285,7 @@ bool LDPC_Coding::LDPC_Encoding(LDPC_int *info_seq, LDPC_int *code_word) {
 			currentcount++;
 		}
 	}
-	for (int num = Info_Size+1;num < CodeWord_Size;num++) {					//process the xor operation between neighbouring parity bits
+	for (int num = Info_Size;num < CodeWord_Size;num++) {					//process the xor operation between neighbouring parity bits
 		code_word[num] ^= code_word[num - 1];
 	}
 	//code_word[Info_Size] ^= code_word[CodeWord_Size - 1];
@@ -427,7 +443,7 @@ bool LDPC_Coding_d::Devide_Memory_Space_Allocation(){
 	/*allocating dynamic memory space for the row and column index mapping array*/
 	/*while using cudaMallocPicth for allocating memory, the actual address can be calculated as follow(2D array -> 1D linear array*/
 	/* T* pElement = (T*)((char*)BaseAddress+Row*pitch)+column */
-	ret = cudaMallocPitch((void**)&Index_Row_Matrix_d, &d_pitch_r, Row_Weight*sizeof(int), Info_Size);
+	ret = cudaMallocPitch((void**)&Index_Row_Matrix_d, &d_pitch_r, Row_Weight*sizeof(int), (CodeWord_Size-Info_Size));
 	checkCudaErrors(ret);
 	if(ret != cudaSuccess){
 		//printf("Error allocating memory!\n");
@@ -448,7 +464,7 @@ bool LDPC_Coding_d::Devide_Memory_Space_Allocation(){
 	}
 	
 	/*allocating dynamic memory space for the forward and backward probability matrix r0,r1,q0 and q1*/
-	ret = cudaMallocPitch((void**)&r0_d, &d_pitch_r, Row_Weight*sizeof(float), Info_Size);
+	ret = cudaMallocPitch((void**)&r0_d, &d_pitch_r, Row_Weight*sizeof(float), (CodeWord_Size-Info_Size));
 	checkCudaErrors(ret);
 	if(ret != cudaSuccess){
 		//printf("Error allocating memory!\n");
@@ -481,16 +497,16 @@ bool LDPC_Coding_d::Devide_Memory_Space_Allocation(){
 
 bool LDPC_Coding_d::CUDA_Configuration(dim3 cfg_para[]){
 	/*create a grid containing 256 blocks with 256 threads of each block*/
-	dim3 numBlocksInit(ceil(CodeWord_Size/DEFAULT_CUDA_THREAD_NUM),1,1);
+	dim3 numBlocksInit(ceil(CodeWord_Size/DEFAULT_CUDA_THREAD_NUM)+1,1,1);
 	dim3 threadsPerBlockInit(DEFAULT_CUDA_THREAD_NUM, 1);
 	
-	dim3 numBlocksP1(ceil(CodeWord_Size/16),1,1);
+	dim3 numBlocksP1(ceil((CodeWord_Size-Info_Size)/16)+1,1,1);
 	dim3 threadsPerBlockP1(MAX_ROW_WEIGHT, 16, 1);
 	/*assign the size of shared memory in kernel function P1*/
 	dim3 size_memP1(16*MAX_ROW_WEIGHT*sizeof(int), 1, 1);
 	
 	//dim3 numBlocksP2(DEFAULT_CUDA_BLOCK_NUM*8,1,1);
-	dim3 numBlocksP2(ceil(CodeWord_Size/32),1,1);
+	dim3 numBlocksP2(ceil(CodeWord_Size/32)+1,1,1);
 	dim3 threadsPerBlockP2(MAX_COLUMN_WEIGHT, 32, 1);
 	dim3 size_memP2(3*MAX_COLUMN_WEIGHT*32*sizeof(float), 1, 1);
 	
@@ -513,7 +529,7 @@ bool LDPC_Coding_d::CUDA_Memcpy_todev(LDPC_Coding entity, bool constant, float *
 	//prinf("Index_Col_Matrix: %d,")
 	if(constant){																//only transfer Index matrix 
 		/*copy index matrix data*/
-		ret = cudaMemcpy2D(Index_Row_Matrix_d, d_pitch_r, entity.Index_Row_Matrix, sizeof(int)*MAX_ROW_WEIGHT, sizeof(int)*MAX_ROW_WEIGHT, Info_Size, cudaMemcpyHostToDevice);
+		ret = cudaMemcpy2D(Index_Row_Matrix_d, d_pitch_r, entity.Index_Row_Matrix, sizeof(int)*MAX_ROW_WEIGHT, sizeof(int)*MAX_ROW_WEIGHT, (CodeWord_Size-Info_Size), cudaMemcpyHostToDevice);
 		checkCudaErrors(ret);
 		if(ret != cudaSuccess){
 			//printf("Error allocating memory!\n");
@@ -565,9 +581,9 @@ bool LDPC_Coding_d::CUDA_Data_callback(LDPC_int *de_info_seq){
 __global__ void CUDA_Info_Init(LDPC_Coding_d entity_d, float variance){
 	int tid_in_grid = blockDim.x*blockIdx.x+threadIdx.x;
 	int count;
-	
-	/* initialization for r0_d and r1_d matrix */	
-	if(tid_in_grid<entity_d.Info_Size){
+	float tol_factor = 10e-3;
+	/* initialization for r0_d matrix */	
+	if(tid_in_grid<(entity_d.CodeWord_Size-entity_d.Info_Size)){
 		for (int j = 0;j < MAX_ROW_WEIGHT;j++){
 			entity_d.r0_d[entity_d.d_pitch_r*tid_in_grid/4+j] = 0.0;			
 		}
@@ -583,7 +599,10 @@ __global__ void CUDA_Info_Init(LDPC_Coding_d entity_d, float variance){
 		/*Prior Probabilities Calculation*/
 		count = 0;
 		entity_d.p0_d[tid_in_grid] = 1.0/ (1 + __expf(2 * entity_d.waveform_d[tid_in_grid] / variance));
-		entity_d.p0_d[tid_in_grid] = __logf(entity_d.p0_d[tid_in_grid]/(1-entity_d.p0_d[tid_in_grid]));	
+		entity_d.p0_d[tid_in_grid] = (isinf(__logf(entity_d.p0_d[tid_in_grid])-__logf(1-entity_d.p0_d[tid_in_grid])))? \
+		__logf(entity_d.p0_d[tid_in_grid]+tol_factor)-__logf(1-entity_d.p0_d[tid_in_grid]+tol_factor) : \
+		__logf(entity_d.p0_d[tid_in_grid])-__logf(1-entity_d.p0_d[tid_in_grid]);
+
 		entity_d.p0_init_d[tid_in_grid] = entity_d.p0_d[tid_in_grid];
 		
 		
@@ -592,7 +611,13 @@ __global__ void CUDA_Info_Init(LDPC_Coding_d entity_d, float variance){
 			
 			count++;	
 		}
-		
+		/*
+		for (int i = 0;i < MAX_COLUMN_WEIGHT;i++){
+			if(isnan(entity_d.q0_d[entity_d.d_pitch_c*i/4+tid_in_grid])){
+				printf("thread: %d\n", tid_in_grid);
+			}
+		}*/
+
 	}
 
 	
@@ -607,7 +632,7 @@ __global__ void LDPC_Decoding_P1(LDPC_Coding_d entity_d){
 	int tid_in_grid = blockIdx.x*blockDim.x*blockDim.y+threadIdx.x+threadIdx.y*blockDim.x;           //the position of each thread in a grid, tid_in_block = threadIdx.x
 	int temp_thread = blockIdx.x*blockDim.y+threadIdx.y;
 	int outer_count, inner_count, tmp;
-	float product;
+	float product, tol_factor = 10e-5;
 	
 	/*use shared memory should be modified when configure the number of thread block and thread*/
 	//assert the block size as(MAX_ROW_WEIGHT, 16, 1)
@@ -615,46 +640,61 @@ __global__ void LDPC_Decoding_P1(LDPC_Coding_d entity_d){
 	
 	/*step 1: update the probability of check nodes with probability of bit nodes*/
 	
-	if(tid_in_grid < entity_d.Info_Size*blockDim.x){
-		#ifdef DEBUG
-		float  start_time, end_time;
-		if(tid_in_grid == 0){	
-			start_time = clock();
-		}
-		#endif	
+	if(tid_in_grid < (entity_d.CodeWord_Size-entity_d.Info_Size)*blockDim.x){
 
 		tmp_row_index_matrix[threadIdx.y*blockDim.x+threadIdx.x] = entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*temp_thread/4+threadIdx.x];
 		__syncthreads();
 		
+		/*
 		#ifdef DEBUG
 		if(tid_in_grid == 0){
 			end_time = clock();
 			printf("The consuming time in Part1 is %.4f us\n", (end_time-start_time)/173);
 		}
-		#endif
-
+		#endif*/
+		
 		if(tmp_row_index_matrix[threadIdx.y*blockDim.x+threadIdx.x] != -1){
 			outer_count = 0;
 			product = 1.0;	
-												
+			
+			/*
+			#ifdef DEBUG
+				if(blockIdx.x == 0){
+					printf("threadIdx.x: %d, threadIdx.y: %d, blockDim.x: %d, tmp: %d\n", threadIdx.x, threadIdx.y, blockDim.x, tmp_row_index_matrix[threadIdx.y*blockDim.x+threadIdx.x]);
+				}
+			#endif
+			*/
+			
 			while (tmp_row_index_matrix[threadIdx.y*blockDim.x+outer_count] != -1) {	
+				
 				inner_count = 0;      
 				tmp = tmp_row_index_matrix[threadIdx.y*blockDim.x+outer_count]; //tmp stores the index to search column
-			    //compare whether two coordinates equal to each other		
+			    
+				//compare whether two coordinates equal to each other		
+				
 				while (entity_d.Index_Col_Matrix_d[entity_d.d_pitch_c*inner_count/4+tmp] != temp_thread) {	
 					inner_count++;
 				}
 								
 				product = (threadIdx.x != outer_count)? product*tanh(entity_d.q0_d[entity_d.d_pitch_c*inner_count/4+tmp]/2) : product;
+				
 				outer_count++;				
 				
-			}				
+			}
 
 			tmp = entity_d.d_pitch_r*temp_thread/4+threadIdx.x;
-			entity_d.r0_d[tmp] = 2*atanh(product);
-			entity_d.r0_d[tmp] =(isinf(entity_d.r0_d[tmp]))? ((entity_d.r0_d[tmp]>0)? 150: -150):entity_d.r0_d[tmp];
-		
-		}		
+			
+			//entity_d.r0_d[tmp] = 2*atanh(product);
+			entity_d.r0_d[tmp] = (isinf(__logf(1+product)-__logf(1-product)) || isnan(__logf(1+product)-__logf(1-product)))? \
+			(isinf(__logf(1+product)-__logf(1-product))? __logf(1+product+tol_factor)-__logf(1-product+tol_factor) : \
+			//__logf(abs(1+product))-__logf(abs(1-product))) : \
+			
+			__logf(1+product)-__logf(1-product)) : \
+			__logf(1+product)-__logf(1-product);			
+
+			//entity_d.r0_d[tmp] = (isnan(entity_d.r0_d[tmp]))? ((product>1)? 150: -150):entity_d.r0_d[tmp];		
+			
+		}	
 				
 	}
 	
@@ -697,6 +737,7 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 			}
 			
 			sum += entity_d.r0_d[entity_d.d_pitch_r*tmp/4+inner_count];
+			
 			__syncthreads();		
 			count++;
 		}
@@ -718,10 +759,11 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 				i /= 2;
 			}
 			
-		}*/
+		}*/	
 		
-		
-		p0_sh[threadIdx.y] = sum+p0_init_sh[threadIdx.y];			
+		p0_sh[threadIdx.y] = sum+p0_init_sh[threadIdx.y];	
+		//p0_sh[threadIdx.y] = (isinf(sum+p0_init_sh[threadIdx.y]))? p0_sh[threadIdx.y]: sum+p0_init_sh[threadIdx.y];	
+		//p0_sh[threadIdx.y] = (isinf(abs(p0_sh[threadIdx.y])))? ((p0_sh[threadIdx.y]>0)? 100: -100):p0_sh[threadIdx.y];
 		//__syncthreads();
 		
 		/*step 3 update the probability of bit nodes with probability of check nodes*/
@@ -734,22 +776,9 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 			}
 	
 			//__syncthreads();
-			
-			#ifdef DEBUG
-			float start_time, end_time;
-			if(tid_in_grid == 0){		
-				start_time = clock();
-			}
-			#endif
-
+				
 			entity_d.q0_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread] = p0_sh[threadIdx.y]-entity_d.r0_d[entity_d.d_pitch_r*tmp/4+inner_count];
-			
-			#ifdef DEBUG
-			if(tid_in_grid == 0){
-				end_time = clock();
-				printf("The consuming time in Part2 is %.4f us\n", (end_time-start_time)/173);
-			}
-			#endif	
+					
 			//__syncthreads();
 			//count++;
 			}

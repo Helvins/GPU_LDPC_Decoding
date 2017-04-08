@@ -2,6 +2,7 @@
 #include "../include/LDPC_Coding.h"
 #include <math.h>
 #include <stdio.h>
+#include <time.h>
 #include <stdlib.h>
 #include <iostream>
 using namespace std;
@@ -28,7 +29,7 @@ float Channel::GaussRand(float Code_Rate) {									//generate a float number th
 	static float V1, V2, S;
 	static int phase = 0;
 	float X;
-
+	srand((unsigned)time(NULL));
 	if (phase == 0) {
 		do {
 			float U1 = (float)rand()/RAND_MAX;
@@ -91,16 +92,9 @@ bool Channel::QPSK_Modulation(LDPC_int *code_word, int length, float *code_word_
 	return SUCCESS;
 }
 
-void Channel::Channel_Transfer(float *waveform, int length, float Code_Rate, bool random) {
+void Channel::Channel_Transfer(float *waveform, int length, float Code_Rate) {
 	for (int i = 0;i < length;i++) {
-		if (random){
 			waveform[i] += GaussRand(Code_Rate);
-
-		}
-		else{
-			waveform[i] += 2;
-		}
-		
 	}
 	cout << "Channel transfer success." << endl;
 }

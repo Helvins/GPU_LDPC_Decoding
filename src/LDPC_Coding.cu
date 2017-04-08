@@ -8,6 +8,7 @@
 #include <string.h>
 #include <math.h>
 #include <cmath>
+#include <time.h>
 #include <stddef.h>
 #include "../include/fileoperation.h"
 using namespace std;
@@ -264,10 +265,11 @@ bool LDPC_Coding::Scan_Check_Matrix() {
 	return SUCCESS;
 }
 
-void LDPC_Coding::WriteData(){
-	printf("Now try to write the row and column index matrix into the output file\n");
-	WriteMatrixData(Index_Row_Matrix, (CodeWord_Size-Info_Size), MAX_ROW_WEIGHT);
+void LDPC_Coding::WriteData(LDPC_int *buf, int length){
+	printf("Now try to write data into the output file\n");
+	//WriteMatrixData(Index_Row_Matrix, (CodeWord_Size-Info_Size), MAX_ROW_WEIGHT);
 	//WriteMatrixData(Index_Col_Matrix, MAX_ROW_WEIGHT, CodeWord_Size);
+	WriteDecodedData(buf, length);
 }
 
 /*LDPC encoding to generate a code word*/
@@ -357,19 +359,20 @@ float LDPC_Coding::ErrorRate_Check(LDPC_int *info_seq, LDPC_int *de_info_seq) {
 }
 
 void LDPC_Coding::Rand_Seq_Generator(LDPC_int *info_seq) {
-	//int temp;
-	/*for (int i = 0;i < Info_Size;i++) {
-		temp = rand() % 2;  // randomly generate an integer 0 or 1
+	//srand((unsigned)time(NULL));
+	for (int i = 0;i < Info_Size;i++) {	
+		int temp = rand() % 2;  // randomly generate an integer 0 or 1
 		info_seq[i] = (temp == 0) ? LDPC_0 : LDPC_1;
-	}*/
-
+	}
+	/*
 	for (int i = 0;i < Info_Size/2;i++) {
 		
 		info_seq[i] = LDPC_1;
 	}
 	for (int i = Info_Size/2;i < Info_Size;i++) {
 		info_seq[i] = LDPC_0;
-	}
+	}*/
+	
 
 }
 
@@ -506,8 +509,8 @@ bool LDPC_Coding_d::CUDA_Configuration(dim3 cfg_para[]){
 	dim3 size_memP1(16*MAX_ROW_WEIGHT*sizeof(int), 1, 1);
 	
 	//dim3 numBlocksP2(DEFAULT_CUDA_BLOCK_NUM*8,1,1);
-	dim3 numBlocksP2(ceil(CodeWord_Size/32)+1,1,1);
-	dim3 threadsPerBlockP2(MAX_COLUMN_WEIGHT, 32, 1);
+	dim3 numBlocksP2(ceil(CodeWord_Size/16)+1,1,1);
+	dim3 threadsPerBlockP2(MAX_COLUMN_WEIGHT, 16, 1);
 	dim3 size_memP2(3*MAX_COLUMN_WEIGHT*32*sizeof(float), 1, 1);
 	
 	cfg_para[0] = numBlocksInit;
@@ -709,11 +712,16 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 	
 	/*use shared memory*/
 	//assert the block size as (MAX_COLUMN_WEIGHT, 32, 1)
+	/*
 	__shared__ float p0_sh[DEFAULT_CUDA_THREAD_NUM/8];
 	__shared__ float p0_init_sh[DEFAULT_CUDA_THREAD_NUM/8];
 		
 	__shared__ int tmp_col_index_matrix[MAX_COLUMN_WEIGHT*DEFAULT_CUDA_THREAD_NUM/8];
-	
+	*/
+	__shared__ float p0_sh[16];
+	__shared__ float p0_init_sh[16];
+		
+	__shared__ int tmp_col_index_matrix[MAX_COLUMN_WEIGHT*16];
 
 	//__shared__ float Sum[MAX_COLUMN_WEIGHT*DEFAULT_CUDA_THREAD_NUM/8];
 	/*step 2: update the credibility of bit nodes at iter iteration */
@@ -741,25 +749,6 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 			__syncthreads();		
 			count++;
 		}
-		/*
-		if(tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x] != -1) {
-			tmp = tmp_col_index_matrix[blockDim.x*threadIdx.y+threadIdx.x];
-			inner_count = 0;
-			
-			while (entity_d.Index_Row_Matrix_d[entity_d.d_pitch_r*tmp/4+inner_count] != temp_thread) {
-				inner_count++;
-			}
-			Sum[blockDim.x*threadIdx.y+threadIdx.x] = entity_d.r0_d[entity_d.d_pitch_r*tmp/4+inner_count];
-			int i = MAX_COLUMN_WEIGHT/2;
-			while(i != 0){
-				if(threadIdx.x<i){
-					Sum[blockDim.x*threadIdx.y+threadIdx.x] += Sum[blockDim.x*threadIdx.y+threadIdx.x+i];
-				}
-				__syncthreads();
-				i /= 2;
-			}
-			
-		}*/	
 		
 		p0_sh[threadIdx.y] = sum+p0_init_sh[threadIdx.y];	
 		//p0_sh[threadIdx.y] = (isinf(sum+p0_init_sh[threadIdx.y]))? p0_sh[threadIdx.y]: sum+p0_init_sh[threadIdx.y];	
@@ -787,6 +776,12 @@ __global__ void LDPC_Decoding_P2(LDPC_Coding_d entity_d){
 		entity_d.de_info_seq_d[temp_thread] = (p0_sh[threadIdx.y] >= 0.0) ? LDPC_0 : LDPC_1;
 		entity_d.p0_d[temp_thread] = p0_sh[threadIdx.y];
 		
+		if(isnan(entity_d.p0_d[temp_thread]) || isinf(entity_d.p0_d[temp_thread])){
+			printf("isnan: %d, isinf: %d, p0: %.4f\n", isnan(entity_d.p0_d[temp_thread]), isinf(entity_d.p0_d[temp_thread]), entity_d.p0_d[temp_thread]);
+		}	
+		else if(isnan(entity_d.q0_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread]) || isinf(entity_d.q0_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread])){
+			printf("isnan: %d, isinf: %d, q0: %.4f\n", isnan(entity_d.q0_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread]), isinf(entity_d.q0_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread]), entity_d.q0_d[entity_d.d_pitch_c*threadIdx.x/4+temp_thread]);
+		}
 		
 	}
 

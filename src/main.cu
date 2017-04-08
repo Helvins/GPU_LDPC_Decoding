@@ -124,8 +124,7 @@ int main(int argc, char *argv[]){
 	if (entity.Scan_Check_Matrix()) {
 		printf("Scan Check matrix success, now we have row and column index matrix\n" );
 	}
-	/*write row and column index matrix to the output files*/
-	entity.WriteData();
+
 	
 	/*Memory copy operation from host terminal to device terminal(should include error handling!!!)*/
 	//entity_d->CUDA_Memcpy_todev(entity);
@@ -139,6 +138,10 @@ int main(int argc, char *argv[]){
 	}
 	
 	entity.Rand_Seq_Generator(info_seq);
+
+	/*write unencoded to the output files*/
+	//entity.WriteData(info_seq, Info_Size);
+	
 	/*encoding process*/
 	if (entity.LDPC_Encoding(info_seq, code_word)) {
 		printf("LDPC encoding success\n");
@@ -151,7 +154,7 @@ int main(int argc, char *argv[]){
 		
 		/*processed by the channel*/
 		chn->BPSK_Modulation(code_word, CodeWord_Size, waveform);
-		chn->Channel_Transfer(waveform, CodeWord_Size, Code_Rate, true);
+		chn->Channel_Transfer(waveform, CodeWord_Size, Code_Rate);
 		
 		entity_d.CUDA_Memcpy_todev(entity, false, waveform);
 	    //calls for GPU kernel function
@@ -185,6 +188,8 @@ int main(int argc, char *argv[]){
 	if (ret == cudaSuccess){
 		printf("The elapsed time for LDPC decoding is %f ms\n", elapsedTime);
 	}
+	/*write unencoded to the output files*/
+	//entity.WriteData(de_info_seq, Info_Size);
 
 	cudaEventDestroy(start);
 	cudaEventDestroy(stop);

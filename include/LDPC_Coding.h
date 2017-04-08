@@ -16,7 +16,7 @@ typedef bool LDPC_int;
 #define DEFAULT_CODE_RATE 1.0/2.0
 #define DEFAULT_UNCODEWORD_SIZE (unsigned int)(DEFAULT_CODEWORD_SIZE*DEFAULT_CODE_RATE)  	  // namely the size of information bit(32400 in this case)
 #define DEFAULT_BLOCK_NUM (unsigned int)(DEFAULT_UNCODEWORD_SIZE/360.0) 					  //(90 in this case)
-#define MAX_ROW_WEIGHT 32  																  //the maximum row weight of sparse check matrix
+#define MAX_ROW_WEIGHT 12 																  //the maximum row weight of sparse check matrix
 #define MAX_COLUMN_WEIGHT 16																  //the maximum column weight of sparse check matrix, we can get it from the DVB-S2 
 
 /*macro definition for cuda configuration*/
@@ -35,7 +35,7 @@ public:
 	bool Check_Matrix_Construct();								      						  //combine Ha matrix and Hb matrix together
 	bool Calculate_Max_Row_Weight();								  						  //calculate the max row weight in the check matrix
 	bool Scan_Check_Matrix();                                         						  //normally return the row index matrix, must be processed after Check_Matrix_Construct()
-	void WriteData();
+	void WriteData(LDPC_int *buf, int length);
 	
 	bool LDPC_Encoding(LDPC_int *info_seq, LDPC_int *code_word);      						  //the encoded sequence and uncoded are separately stored in code_word and info_seq
 	bool LDPC_Encoding_Check(LDPC_int *code_word);                    						  //Process H*r to verify if the answer equals to vector 0

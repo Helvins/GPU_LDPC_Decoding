@@ -93,6 +93,7 @@ public:
 	
 	int *Index_Row_Matrix_d;											  		  //matrix to store the column position of non-zero elements(Info_Size*MAX_ROW_WEIGHT), the size of each row is the row weight of the sparse matrix 	
 	int *Index_Col_Matrix_d;										      		  //matrix to store the row position of non-zero elements(MAX_COLUMN_WEIGHT*CodeWord_Size), the size of each column is the column weight of the sparse matrix 
+	
 };
 
 /*declaration of kernel function executed in the GPU terminal*/
